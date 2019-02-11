@@ -1,7 +1,8 @@
 ﻿using LibVLCSharp.Shared;
+using System;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace WpfApp1
 {
@@ -25,7 +26,7 @@ namespace WpfApp1
         MediaPlayer mpOut;
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
+        {           
             var filename = "video1.mp4";
             var filename2 = "video2.mp4";
 
@@ -37,7 +38,7 @@ namespace WpfApp1
 
             var media = new Media(libVLC, filename);
             media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=1,height=200,width=300}}");
-            //media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=1,height=200,width=300},dst=display}");
+
             mp0 = new MediaPlayer(media);
             media.Dispose();
 
@@ -45,7 +46,6 @@ namespace WpfApp1
 
             media = new Media(libVLC, filename2);
             media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=2,height=200,width=300}}");
-            //media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=2,height=200,width=300},dst=display}");
             mp1 = new MediaPlayer(media);
             media.Dispose();
 
@@ -53,7 +53,6 @@ namespace WpfApp1
 
             media = new Media(libVLC, filename);
             media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=3,height=200,width=300}}");
-            //media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=3,height=200,width=300},dst=display}");
             mp2 = new MediaPlayer(media);
             media.Dispose();
 
@@ -61,14 +60,12 @@ namespace WpfApp1
 
             media = new Media(libVLC, filename2);
             media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=4,height=200,width=300}}");
-            //media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=4,height=200,width=300},dst=display}");
             mp3 = new MediaPlayer(media);
             media.Dispose();
 
             // mosaic out
 
             media = new Media(libVLC, "cone.png");
-            //var soutOption = ":sout=#transcode{sfilter=mosaic{keep-picture,width=600,height=400,cols=2,rows=2},vcodec=mp4v,vb=20000,acodec=none,fps=10,scale=1}:file{dst=lol.ts,mux=ts}";
             var soutOption = ":sout=#transcode{sfilter=mosaic{keep-picture,width=600,height=400,cols=2,rows=2},vcodec=mp4v,vb=20000,acodec=none,fps=10,scale=1}:duplicate{dst=file{dst=lol.ts,mux=ts},dst=display}";
             media.AddOption(soutOption);
             media.AddOption(":image-duration=-1");
@@ -84,8 +81,7 @@ namespace WpfApp1
             mp2.Play();
             mp3.Play();
 
-            Thread.Sleep(10000);
-            //await Task.Delay(10000);
+            Wait(5);
 
             mp0.Stop();
             mp1.Stop();
@@ -100,7 +96,17 @@ namespace WpfApp1
             mpOut.Dispose();
 
             libVLC.Dispose();
+        }
 
+        void Wait(double seconds)
+        {
+            var frame = new DispatcherFrame();
+            new Thread(() =>
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(seconds));
+                frame.Continue = false;
+            }).Start();
+            Dispatcher.PushFrame(frame);
         }
     }
 }
