@@ -1,5 +1,10 @@
 ﻿using LibVLCSharp.Shared;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
@@ -37,7 +42,7 @@ namespace WpfApp1
             // mosaic 1
 
             var media = new Media(libVLC, filename);
-            media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=1,height=200,width=300}}");
+            media.AddOption(":sout=#duplicate{dst=mosaic-bridge{id=1,height=200,width=300},dst=display}");
 
             mp0 = new MediaPlayer(media);
             media.Dispose();
@@ -66,7 +71,9 @@ namespace WpfApp1
             // mosaic out
 
             media = new Media(libVLC, "cone.png");
-            var soutOption = ":sout=#transcode{sfilter=mosaic{keep-picture,width=600,height=400,cols=2,rows=2},vcodec=mp4v,vb=20000,acodec=none,fps=10,scale=1}:duplicate{dst=file{dst=lol.ts,mux=ts},dst=display}";
+            //var soutOption = ":sout=#transcode{sfilter=mosaic{keep-picture,width=600,height=400,cols=2,rows=2},vcodec=mp4v,vb=20000,acodec=none,fps=10,scale=1}:duplicate{dst=file{dst=lol.ts,mux=ts},dst=display}";
+
+            var soutOption = ":sout=#transcode{sfilter=mosaic{keep-picture,width=600,height=400,cols=2,rows=2},vcodec=mp4v,vb=20000,acodec=none,fps=10,scale=1}:duplicate{dst=file{dst=lol.ts,mux=ts}}";
             media.AddOption(soutOption);
             media.AddOption(":image-duration=-1");
 
@@ -81,7 +88,21 @@ namespace WpfApp1
             mp2.Play();
             mp3.Play();
 
-            Wait(5);
+            Thread.Sleep(1000);
+
+            foreach (var handle in EnumerateProcessWindowHandles(Process.GetCurrentProcess().Id))
+            {
+                StringBuilder message = new StringBuilder(1000);
+                SendMessage(handle, WM_GETTEXT, message.Capacity, message);
+                Console.WriteLine(message);
+                if(message.ToString().StartsWith("VLC"))
+                {
+                    mp0.Hwnd = handle;
+                    break;
+                }
+            }
+
+            Wait(10);
 
             mp0.Stop();
             mp1.Stop();
@@ -108,5 +129,26 @@ namespace WpfApp1
             }).Start();
             Dispatcher.PushFrame(frame);
         }
+
+
+        delegate bool EnumThreadDelegate(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        static extern bool EnumThreadWindows(int dwThreadId, EnumThreadDelegate lpfn, IntPtr lParam);
+
+        static IEnumerable<IntPtr> EnumerateProcessWindowHandles(int processId)
+        {
+            var handles = new List<IntPtr>();
+
+            foreach (ProcessThread thread in Process.GetProcessById(processId).Threads)
+                EnumThreadWindows(thread.Id, (hWnd, lParam) => { handles.Add(hWnd); return true; }, IntPtr.Zero);
+
+            return handles;
+        }
+
+        private const uint WM_GETTEXT = 0x000D;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, int wParam, StringBuilder lParam);
     }
 }
